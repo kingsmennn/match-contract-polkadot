@@ -16,6 +16,9 @@ mod marketplace {
         InvalidRequest,
         InvalidOffer,
         InvalidRequestOfferCombination,
+        RequestLocked,
+        UnauthorizedBuyer,
+        OfferAlreadyAccepted,
     }
 
     pub type Result<T> = core::result::Result<T, MarketplaceError>;
@@ -32,6 +35,7 @@ mod marketplace {
         store_counter: u64,
         request_counter: u64,
         offer_counter: u64,
+        TIME_TO_LOCK: u64,
     }
 
     #[derive(Clone)]
@@ -206,8 +210,7 @@ mod marketplace {
         seller_address: AccountId,
     }
 
-    #[derive(Clone)]
-    #[derive(PartialEq)]
+    #[derive(Clone, PartialEq)]
     #[cfg_attr(
         feature = "std",
         derive(Debug, Eq, ink::storage::traits::StorageLayout)
@@ -265,6 +268,7 @@ mod marketplace {
                 store_counter: 0,
                 request_counter: 0,
                 offer_counter: 0,
+                TIME_TO_LOCK: 900,
             }
         }
 
@@ -459,8 +463,11 @@ mod marketplace {
             request_id: u64,
             price: i64,
             images: Vec<String>,
+            store_name: String,
         ) -> Result<()> {
             let caller = self.env().caller();
+
+            // Fetch user and validate seller status
             let user = self
                 .users
                 .get(caller)
@@ -470,60 +477,125 @@ mod marketplace {
                 return Err(MarketplaceError::OnlySellersAllowed);
             }
 
+            // Fetch the request and validate its existence
             let mut request = self
                 .requests
                 .get(request_id)
                 .ok_or(MarketplaceError::InvalidRequest)?;
 
+            // Check if the request is locked due to timeout or lifecycle status
+            if self.env().block_timestamp() > request.updated_at + self.TIME_TO_LOCK
+                && request.lifecycle == RequestLifecycle::AcceptedByBuyer
+            {
+                return Err(MarketplaceError::RequestLocked);
+            }
+
+            // Increment offer counter and create new offer
             self.offer_counter = self.offer_counter.checked_add(1).unwrap();
+
             let new_offer = Offer {
                 id: self.offer_counter,
                 price,
                 images: images.clone(),
                 request_id,
-                store_name: String::from("Sample Store"),
+                store_name: store_name.clone(),
                 seller_id: user.id,
                 is_accepted: false,
                 created_at: self.env().block_timestamp(),
                 updated_at: self.env().block_timestamp(),
             };
 
+            // Insert the new offer into storage
             self.offers.insert(self.offer_counter, &new_offer);
 
+            // Update the request with the new seller and offer details
             request.seller_ids.push(user.id);
             request.offer_ids.push(self.offer_counter);
             request.updated_at = self.env().block_timestamp();
             self.requests.insert(request_id, &request);
 
+            // Emit event for offer creation
             self.env().emit_event(OfferCreated {
                 offer_id: self.offer_counter,
                 seller_address: caller,
-                store_name: String::from("Sample Store"),
+                store_name: store_name.clone(),
                 price,
                 request_id,
                 images,
                 seller_id: user.id,
                 seller_ids: request.seller_ids.clone(),
             });
+
             Ok(())
         }
 
         #[ink(message)]
-        pub fn accept_offer(&mut self, request_id: u64, offer_id: u64) -> Result<()> {
+        pub fn accept_offer(&mut self, offer_id: u64) -> Result<()> {
             let caller = self.env().caller();
-            let mut request = self
-                .requests
-                .get(request_id)
-                .ok_or(MarketplaceError::InvalidRequest)?;
+
+            // Fetch the offer and validate its existence
             let mut offer = self
                 .offers
                 .get(offer_id)
                 .ok_or(MarketplaceError::InvalidOffer)?;
 
+            let request_id = offer.request_id;
+
+            // Fetch the request and validate its existence
+            let mut request = self
+                .requests
+                .get(request_id)
+                .ok_or(MarketplaceError::InvalidRequest)?;
+
+            // Check that the offer belongs to the correct request
             if offer.request_id != request_id {
                 return Err(MarketplaceError::InvalidRequestOfferCombination);
             }
 
+            // Ensure the caller is the authorized buyer for this request
+            let buyer = self
+                .users
+                .get(caller)
+                .ok_or(MarketplaceError::InvalidUser)?;
+
+            if buyer.account_type != AccountType::Buyer {
+                return Err(MarketplaceError::OnlyBuyersAllowed);
+            }
+
+            if request.buyer_id != buyer.id {
+                return Err(MarketplaceError::UnauthorizedBuyer);
+            }
+
+            // Check if the offer has already been accepted
+            if offer.is_accepted {
+                return Err(MarketplaceError::OfferAlreadyAccepted);
+            }
+
+            // Check if the request is locked due to timeout or lifecycle status
+            if self.env().block_timestamp() > request.updated_at + self.TIME_TO_LOCK
+                && request.lifecycle == RequestLifecycle::AcceptedByBuyer
+            {
+                return Err(MarketplaceError::RequestLocked);
+            }
+
+            // Update previous offers for the same request to set `is_accepted` to false
+            for offer_id in request.offer_ids.iter() {
+                if let Some(mut previous_offer) = self.offers.get(*offer_id) {
+                    if previous_offer.is_accepted && previous_offer.request_id == request_id {
+                        previous_offer.is_accepted = false;
+                        self.offers.insert(*offer_id, &previous_offer);
+
+                        // Emit event for un-accepting the previous offer
+                        self.env().emit_event(OfferAccepted {
+                            offer_id: previous_offer.id,
+                            buyer_address: caller,
+                            is_accepted: false,
+                        });
+                    }
+                }
+            }
+
+            // Accept the current offer
             offer.is_accepted = true;
             self.offers.insert(offer_id, &offer);
             request.locked_seller_id = offer.seller_id;
@@ -531,11 +603,21 @@ mod marketplace {
             request.updated_at = self.env().block_timestamp();
             self.requests.insert(request_id, &request);
 
+            // Emit events for request and offer acceptance
+            self.env().emit_event(RequestAccepted {
+                request_id,
+                offer_id,
+                seller_id: offer.seller_id,
+                updated_at: request.updated_at,
+                sellers_price_quote: offer.price,
+            });
+
             self.env().emit_event(OfferAccepted {
                 offer_id,
                 buyer_address: caller,
                 is_accepted: true,
             });
+
             Ok(())
         }
     }

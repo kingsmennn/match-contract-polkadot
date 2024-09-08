@@ -15,7 +15,6 @@ mod marketplace {
         OnlyBuyersAllowed,
         InvalidRequest,
         InvalidOffer,
-        InvalidRequestOfferCombination,
         RequestLocked,
         UnauthorizedBuyer,
         OfferAlreadyAccepted,
@@ -546,11 +545,6 @@ mod marketplace {
                 .requests
                 .get(request_id)
                 .ok_or(MarketplaceError::InvalidRequest)?;
-
-            // Check that the offer belongs to the correct request
-            if offer.request_id != request_id {
-                return Err(MarketplaceError::InvalidRequestOfferCombination);
-            }
 
             // Ensure the caller is the authorized buyer for this request
             let buyer = self

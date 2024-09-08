@@ -226,10 +226,10 @@ mod marketplace {
         }
     }
 
-    #[derive(Clone)]
+    #[derive(Clone, PartialEq)]
     #[cfg_attr(
         feature = "std",
-        derive(Debug, PartialEq, Eq, ink::storage::traits::StorageLayout)
+        derive(Debug, Eq, ink::storage::traits::StorageLayout)
     )]
     #[ink::scale_derive(Encode, Decode, TypeInfo)]
     pub enum RequestLifecycle {
@@ -244,13 +244,6 @@ mod marketplace {
         fn default() -> Self {
             RequestLifecycle::Pending
         }
-    }
-
-    #[ink(event)]
-    pub struct RequestLifecycleChanged {
-        #[ink(topic)]
-        request_id: u64,
-        new_lifecycle: u8,
     }
 
     #[ink(impl)]
@@ -483,7 +476,8 @@ mod marketplace {
                 .ok_or(MarketplaceError::InvalidRequest)?;
 
             // Check if the request is locked due to timeout or lifecycle status
-            if self.env().block_timestamp() > request.updated_at + self.TIME_TO_LOCK
+            if self.env().block_timestamp()
+                > request.updated_at.checked_add(self.TIME_TO_LOCK).unwrap()
                 && request.lifecycle == RequestLifecycle::AcceptedByBuyer
             {
                 return Err(MarketplaceError::RequestLocked);
@@ -566,7 +560,8 @@ mod marketplace {
             }
 
             // Check if the request is locked due to timeout or lifecycle status
-            if self.env().block_timestamp() > request.updated_at + self.TIME_TO_LOCK
+            if self.env().block_timestamp()
+                > request.updated_at.checked_add(self.TIME_TO_LOCK).unwrap()
                 && request.lifecycle == RequestLifecycle::AcceptedByBuyer
             {
                 return Err(MarketplaceError::RequestLocked);

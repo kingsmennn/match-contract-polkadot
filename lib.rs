@@ -22,21 +22,6 @@ mod marketplace {
 
     pub type Result<T> = core::result::Result<T, MarketplaceError>;
 
-    #[derive(Default)]
-    #[ink(storage)]
-    pub struct Marketplace {
-        users: Mapping<AccountId, User>,
-        requests: Mapping<u64, Request>,
-        offers: Mapping<u64, Offer>,
-        user_store_ids: Mapping<AccountId, Vec<u64>>,
-        user_stores: Mapping<(AccountId, u64), Store>,
-        user_counter: u64,
-        store_counter: u64,
-        request_counter: u64,
-        offer_counter: u64,
-        TIME_TO_LOCK: u64,
-    }
-
     #[derive(Clone)]
     #[cfg_attr(
         feature = "std",
@@ -246,7 +231,20 @@ mod marketplace {
         }
     }
 
-    #[ink(impl)]
+    #[ink(storage)]
+    pub struct Marketplace {
+        users: Mapping<AccountId, User>,
+        requests: Mapping<u64, Request>,
+        offers: Mapping<u64, Offer>,
+        user_store_ids: Mapping<AccountId, Vec<u64>>,
+        user_stores: Mapping<(AccountId, u64), Store>,
+        user_counter: u64,
+        store_counter: u64,
+        request_counter: u64,
+        offer_counter: u64,
+        TIME_TO_LOCK: u64,
+    }
+
     impl Marketplace {
         #[ink(constructor)]
         pub fn new() -> Self {

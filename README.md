@@ -1,4 +1,4 @@
-This repository contains a Solana smart contract for a decentralized marketplace built with Ink!. The contract allows users to create buyer/seller profiles, create stores and requests, and submit or accept offers.
+This repository contains a Polkadot smart contract for a decentralized marketplace built with Ink!. The contract allows users to create buyer/seller profiles, create stores and requests, and submit or accept offers.
 
 ### Structs and Enums
 

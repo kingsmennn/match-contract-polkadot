@@ -609,5 +609,20 @@ mod marketplace {
 
             Ok(())
         }
+
+        #[ink(message)]
+        pub fn get_user(&self, user_address: AccountId) -> Option<User> {
+            self.users.get(user_address)
+        }
+
+        #[ink(message)]
+        pub fn get_request(&self, request_id: u64) -> Option<Request> {
+            self.requests.get(request_id)
+        }
+
+        #[ink(message)]
+        pub fn get_offer(&self, offer_id: u64) -> Option<Offer> {
+            self.offers.get(offer_id)
+        }
     }
 }

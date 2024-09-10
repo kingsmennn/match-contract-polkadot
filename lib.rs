@@ -624,10 +624,22 @@ mod marketplace {
         }
 
         #[ink(message)]
+        pub fn get_offer_by_request(&self, request_id: u64) -> Vec<Offer> {
+            let mut request_offers = Vec::new();
+            let request = self.requests.get(request_id).unwrap();
+            for offer_id in request.offer_ids.iter() {
+                if let Some(offer) = self.offers.get(*offer_id) {
+                    request_offers.push(offer.clone());
+                }
+            }
+            request_offers
+        }
+
+        #[ink(message)]
         pub fn get_user_requests(&self, user_address: AccountId) -> Vec<Request> {
             let mut user_requests = Vec::new();
             let user = self.users.get(user_address).unwrap();
-            for request_id in 0..self.request_counter {
+            for request_id in 0..=self.request_counter {
                 if let Some(request) = self.requests.get(request_id) {
                     if request.buyer_id == user.id {
                         user_requests.push(request.clone());
@@ -635,6 +647,17 @@ mod marketplace {
                 }
             }
             user_requests
+        }
+
+        #[ink(message)]
+        pub fn get_all_requests(&self) -> Vec<Request> {
+            let mut all_requests = Vec::new();
+            for request_id in 0..=self.request_counter {
+                if let Some(request) = self.requests.get(request_id) {
+                    all_requests.push(request.clone());
+                }
+            }
+            all_requests
         }
     }
 }

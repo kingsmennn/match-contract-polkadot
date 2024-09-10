@@ -622,5 +622,19 @@ mod marketplace {
         pub fn get_offer(&self, offer_id: u64) -> Option<Offer> {
             self.offers.get(offer_id)
         }
+
+        #[ink(message)]
+        pub fn get_user_requests(&self, user_address: AccountId) -> Vec<Request> {
+            let mut user_requests = Vec::new();
+            let user = self.users.get(user_address).unwrap();
+            for request_id in 0..self.request_counter {
+                if let Some(request) = self.requests.get(request_id) {
+                    if request.buyer_id == user.id {
+                        user_requests.push(request.clone());
+                    }
+                }
+            }
+            user_requests
+        }
     }
 }

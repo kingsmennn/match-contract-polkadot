@@ -261,7 +261,7 @@ mod marketplace {
                 store_counter: 0,
                 request_counter: 0,
                 offer_counter: 0,
-                TIME_TO_LOCK: 900,
+                TIME_TO_LOCK: 900 * 1000,
                 user_ids: Mapping::default(),
             }
         }
@@ -596,6 +596,7 @@ mod marketplace {
             offer.is_accepted = true;
             self.offers.insert(offer_id, &offer);
             request.locked_seller_id = offer.seller_id;
+            request.sellers_price_quote = offer.price;
             request.lifecycle = RequestLifecycle::AcceptedByBuyer;
             request.updated_at = self.env().block_timestamp();
             self.requests.insert(request_id, &request);

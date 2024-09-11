@@ -61,6 +61,7 @@ mod marketplace {
         created_at: u64,
         updated_at: u64,
         account_type: AccountType,
+        authority: AccountId,
     }
 
     #[derive(Clone)]
@@ -101,6 +102,7 @@ mod marketplace {
         is_accepted: bool,
         created_at: u64,
         updated_at: u64,
+        authority: AccountId,
     }
 
     #[ink(event)]
@@ -243,6 +245,7 @@ mod marketplace {
         request_counter: u64,
         offer_counter: u64,
         TIME_TO_LOCK: u64,
+        user_ids: Mapping<u64, AccountId>,
     }
 
     impl Marketplace {
@@ -259,6 +262,7 @@ mod marketplace {
                 request_counter: 0,
                 offer_counter: 0,
                 TIME_TO_LOCK: 900,
+                user_ids: Mapping::default(),
             }
         }
 
@@ -288,9 +292,11 @@ mod marketplace {
                 created_at: self.env().block_timestamp(),
                 updated_at: self.env().block_timestamp(),
                 account_type: account_type.clone(),
+                authority: caller.clone(),
             };
 
-            self.users.insert(caller, &new_user);
+            self.users.insert(&caller, &new_user);
+            self.user_ids.insert(self.user_counter, &caller);
             self.env().emit_event(UserCreated {
                 user_address: caller,
                 user_id: self.user_counter,
@@ -494,10 +500,16 @@ mod marketplace {
                 is_accepted: false,
                 created_at: self.env().block_timestamp(),
                 updated_at: self.env().block_timestamp(),
+                authority: caller.clone(),
             };
 
             // Insert the new offer into storage
             self.offers.insert(self.offer_counter, &new_offer);
+
+            if request.lifecycle == RequestLifecycle::Pending {
+                request.lifecycle = RequestLifecycle::AcceptedBySeller;
+                request.updated_at = self.env().block_timestamp();
+            }
 
             // Update the request with the new seller and offer details
             request.seller_ids.push(user.id);
@@ -658,6 +670,40 @@ mod marketplace {
                 }
             }
             all_requests
+        }
+
+        #[ink(message)]
+        pub fn get_user_stores(&self, user_address: AccountId) -> Vec<Store> {
+            let mut user_stores = Vec::new();
+            let store_ids = self.user_store_ids.get(user_address).unwrap_or_default();
+            for store_id in store_ids.iter() {
+                if let Some(store) = self.user_stores.get((user_address, *store_id)) {
+                    user_stores.push(store.clone());
+                }
+            }
+            user_stores
+        }
+
+        #[ink(message)]
+        pub fn get_user_by_id(&self, user_id: u64) -> Option<User> {
+            if let Some(account_id) = self.user_ids.get(&user_id) {
+                self.users.get(&account_id) // Retrieve the user by the AccountId
+            } else {
+                None
+            }
+        }
+
+        #[ink(message)]
+        pub fn get_seller_offers(&self, seller_address: AccountId) -> Vec<Offer> {
+            let mut seller_offers = Vec::new();
+            for offer_id in 0..=self.offer_counter {
+                if let Some(offer) = self.offers.get(offer_id) {
+                    if offer.authority == seller_address {
+                        seller_offers.push(offer.clone());
+                    }
+                }
+            }
+            seller_offers
         }
     }
 }

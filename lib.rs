@@ -134,6 +134,15 @@ mod marketplace {
     }
 
     #[ink(event)]
+    pub struct RequestRemoved {
+        #[ink(topic)]
+        request_id: u64,
+        #[ink(topic)]
+        buyer_address: AccountId,
+        removed_at: u64,
+    }
+
+    #[ink(event)]
     pub struct OfferAccepted {
         #[ink(topic)]
         offer_id: u64,
@@ -450,6 +459,43 @@ mod marketplace {
                 created_at: self.env().block_timestamp(),
                 updated_at: self.env().block_timestamp(),
             });
+            Ok(())
+        }
+
+        #[ink(message)]
+        pub fn remove_request(&mut self, request_id: u64) -> Result<()> {
+            let caller = self.env().caller();
+
+            // Fetch the request, or return an error if it doesn't exist
+            let request = self
+                .requests
+                .get(request_id)
+                .ok_or(MarketplaceError::InvalidRequest)?;
+
+            // Check if the caller is the buyer who created the request
+            let user = self
+                .users
+                .get(caller)
+                .ok_or(MarketplaceError::InvalidUser)?;
+
+            if request.buyer_id != user.id {
+                return Err(MarketplaceError::UnauthorizedBuyer);
+            }
+
+            if request.lifecycle != RequestLifecycle::Pending {
+                return Err(MarketplaceError::RequestLocked);
+            }
+
+            // Remove the request from storage
+            self.requests.take(request_id);
+
+            // Emit an event for the removed request
+            self.env().emit_event(RequestRemoved {
+                request_id,
+                buyer_address: caller,
+                removed_at: self.env().block_timestamp(),
+            });
+
             Ok(())
         }
 

@@ -18,6 +18,8 @@ mod marketplace {
         RequestLocked,
         UnauthorizedBuyer,
         OfferAlreadyAccepted,
+        RequestNotAccepted,
+        NotLocked,
     }
 
     pub type Result<T> = core::result::Result<T, MarketplaceError>;
@@ -661,6 +663,45 @@ mod marketplace {
                 buyer_address: caller,
                 is_accepted: true,
             });
+
+            Ok(())
+        }
+
+        #[ink(message)]
+        pub fn mark_request_as_completed(&mut self, request_id: u64) -> Result<()> {
+            let caller = self.env().caller();
+
+            let mut request = self
+                .requests
+                .get(request_id)
+                .ok_or(MarketplaceError::InvalidRequest)?;
+
+            let buyer = self
+                .users
+                .get(caller)
+                .ok_or(MarketplaceError::InvalidUser)?;
+
+            if buyer.account_type != AccountType::Buyer {
+                return Err(MarketplaceError::OnlyBuyersAllowed);
+            }
+
+            if request.buyer_id != buyer.id {
+                return Err(MarketplaceError::UnauthorizedBuyer);
+            }
+
+            if request.lifecycle != RequestLifecycle::AcceptedByBuyer {
+                return Err(MarketplaceError::RequestNotAccepted);
+            }
+
+            if request.updated_at.checked_add(self.TIME_TO_LOCK).unwrap()
+                > self.env().block_timestamp()
+            {
+                return Err(MarketplaceError::NotLocked);
+            }
+
+            request.lifecycle = RequestLifecycle::Completed;
+            request.updated_at = self.env().block_timestamp();
+            self.requests.insert(request_id, &request);
 
             Ok(())
         }

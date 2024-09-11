@@ -508,7 +508,6 @@ mod marketplace {
 
             if request.lifecycle == RequestLifecycle::Pending {
                 request.lifecycle = RequestLifecycle::AcceptedBySeller;
-                request.updated_at = self.env().block_timestamp();
             }
 
             // Update the request with the new seller and offer details

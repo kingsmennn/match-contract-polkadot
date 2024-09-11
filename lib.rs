@@ -705,4 +705,106 @@ mod marketplace {
             seller_offers
         }
     }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use ink::env::{test, DefaultEnvironment};
+        use ink::primitives::{Clear, Hash};
+
+        // Helper function to set up the test environment
+        fn set_contract_env() {
+            let accounts = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>();
+            ink::env::test::set_caller::<DefaultEnvironment>(accounts.alice);
+            // ink::env::test::set_balance::<DefaultEnvironment>(accounts.alice, 1000);
+        }
+
+        #[test]
+        fn test_contract_initialization() {
+            set_contract_env();
+            let contract = Marketplace::new();
+            assert_eq!(contract.user_counter, 0);
+            assert_eq!(contract.store_counter, 0);
+            assert_eq!(contract.request_counter, 0);
+            assert_eq!(contract.offer_counter, 0);
+            assert_eq!(contract.TIME_TO_LOCK, 900 * 1000);
+        }
+
+        #[test]
+        fn test_create_user() {
+            set_contract_env();
+            let mut contract = Marketplace::new();
+
+            let username = "Alice".to_string();
+            let phone = "1234567890".to_string();
+            let latitude = 12345;
+            let longitude = 54321;
+            let account_type = AccountType::Buyer;
+
+            let result = contract.create_user(
+                username.clone(),
+                phone.clone(),
+                latitude,
+                longitude,
+                account_type.clone(),
+            );
+            assert!(result.is_ok());
+
+            let caller = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
+            let user = contract.users.get(caller).unwrap();
+
+            assert_eq!(user.username, username);
+            assert_eq!(user.phone, phone);
+            assert_eq!(user.location.latitude, latitude);
+            assert_eq!(user.location.longitude, longitude);
+            assert_eq!(user.account_type, account_type);
+        }
+
+        #[test]
+        fn test_update_user() {
+            set_contract_env();
+            let mut contract = Marketplace::new();
+
+            let username = "Alice".to_string();
+            let phone = "1234567890".to_string();
+            let latitude = 12345;
+            let longitude = 54321;
+            let account_type = AccountType::Buyer;
+
+            contract
+                .create_user(
+                    username.clone(),
+                    phone.clone(),
+                    latitude,
+                    longitude,
+                    account_type.clone(),
+                )
+                .unwrap();
+
+            // Update the user
+            let new_username = "AliceUpdated".to_string();
+            let new_phone = "0987654321".to_string();
+            let new_latitude = 67890;
+            let new_longitude = 98765;
+            let new_account_type = AccountType::Seller;
+
+            let result = contract.update_user(
+                new_username.clone(),
+                new_phone.clone(),
+                new_latitude,
+                new_longitude,
+                new_account_type.clone(),
+            );
+            assert!(result.is_ok());
+
+            let caller = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
+            let user = contract.users.get(caller).unwrap();
+
+            assert_eq!(user.username, new_username);
+            assert_eq!(user.phone, new_phone);
+            assert_eq!(user.location.latitude, new_latitude);
+            assert_eq!(user.location.longitude, new_longitude);
+            assert_eq!(user.account_type, new_account_type);
+        }
+    }
 }

@@ -513,7 +513,6 @@ mod marketplace {
             // Update the request with the new seller and offer details
             request.seller_ids.push(user.id);
             request.offer_ids.push(self.offer_counter);
-            request.updated_at = self.env().block_timestamp();
             self.requests.insert(request_id, &request);
 
             // Emit event for offer creation

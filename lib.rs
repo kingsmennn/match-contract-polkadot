@@ -709,19 +709,24 @@ mod marketplace {
     #[cfg(test)]
     mod tests {
         use super::*;
-        use ink::env::{test, DefaultEnvironment};
-        use ink::primitives::{Clear, Hash};
+        use ink::env::DefaultEnvironment;
 
         // Helper function to set up the test environment
-        fn set_contract_env() {
+        fn set_buyer_env() {
             let accounts = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>();
             ink::env::test::set_caller::<DefaultEnvironment>(accounts.alice);
-            // ink::env::test::set_balance::<DefaultEnvironment>(accounts.alice, 1000);
+            ink::env::test::set_callee::<DefaultEnvironment>(accounts.alice);
+        }
+
+        fn set_seller_env() {
+            let accounts = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>();
+            ink::env::test::set_caller::<DefaultEnvironment>(accounts.bob);
+            ink::env::test::set_callee::<DefaultEnvironment>(accounts.bob);
         }
 
         #[test]
         fn test_contract_initialization() {
-            set_contract_env();
+            set_buyer_env();
             let contract = Marketplace::new();
             assert_eq!(contract.user_counter, 0);
             assert_eq!(contract.store_counter, 0);
@@ -732,7 +737,7 @@ mod marketplace {
 
         #[test]
         fn test_create_user() {
-            set_contract_env();
+            set_buyer_env();
             let mut contract = Marketplace::new();
 
             let username = "Alice".to_string();
@@ -762,7 +767,7 @@ mod marketplace {
 
         #[test]
         fn test_update_user() {
-            set_contract_env();
+            set_buyer_env();
             let mut contract = Marketplace::new();
 
             let username = "Alice".to_string();
@@ -806,5 +811,260 @@ mod marketplace {
             assert_eq!(user.location.longitude, new_longitude);
             assert_eq!(user.account_type, new_account_type);
         }
+
+        #[test]
+        fn test_create_store() {
+            set_buyer_env();
+            let mut contract = Marketplace::new();
+
+            // Create a seller
+            let username = "Alice".to_string();
+            let phone = "1234567890".to_string();
+            let latitude = 12345;
+            let longitude = 54321;
+            let account_type = AccountType::Seller;
+            contract
+                .create_user(
+                    username.clone(),
+                    phone.clone(),
+                    latitude,
+                    longitude,
+                    account_type,
+                )
+                .unwrap();
+
+            // Create a store
+            let store_name = "My Store".to_string();
+            let store_description = "Best Store".to_string();
+            let result = contract.create_store(
+                store_name.clone(),
+                store_description.clone(),
+                phone.clone(),
+                latitude,
+                longitude,
+            );
+            assert!(result.is_ok());
+
+            // Check store creation
+            let caller = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
+            let stores = contract.get_user_stores(caller);
+            assert_eq!(stores.len(), 1);
+            assert_eq!(stores[0].name, store_name);
+            assert_eq!(stores[0].description, store_description);
+        }
+
+        #[test]
+        fn test_create_request() {
+            set_buyer_env();
+            let mut contract = Marketplace::new();
+
+            // Create a buyer
+            let username = "Bob".to_string();
+            let phone = "0987654321".to_string();
+            let latitude = 98765;
+            let longitude = 56789;
+            let account_type = AccountType::Buyer;
+            contract
+                .create_user(
+                    username.clone(),
+                    phone.clone(),
+                    latitude,
+                    longitude,
+                    account_type,
+                )
+                .unwrap();
+
+            // Create a request
+            let request_name = "Request 1".to_string();
+            let request_description = "Need this item".to_string();
+            let images = vec!["image1".to_string(), "image2".to_string()];
+            let result = contract.create_request(
+                request_name.clone(),
+                request_description.clone(),
+                images.clone(),
+                latitude,
+                longitude,
+            );
+            assert!(result.is_ok());
+
+            // Check request creation
+            let requests = contract.get_all_requests();
+            assert_eq!(requests.len(), 1);
+            assert_eq!(requests[0].name, request_name);
+            assert_eq!(requests[0].description, request_description);
+            assert_eq!(requests[0].images, images);
+        }
+
+        #[test]
+        fn test_create_offer() {
+            set_buyer_env();
+            let mut contract = Marketplace::new();
+
+            // Create a buyer and a request
+            let buyer_name = "Alice".to_string();
+            let buyer_phone = "0987654321".to_string();
+            let latitude = 98765;
+            let longitude = 56789;
+            let buyer_account_type = AccountType::Buyer;
+            contract
+                .create_user(
+                    buyer_name.clone(),
+                    buyer_phone.clone(),
+                    latitude,
+                    longitude,
+                    buyer_account_type,
+                )
+                .unwrap();
+
+            let request_name = "Request 1".to_string();
+            let request_description = "Need this item".to_string();
+            let images = vec!["image1".to_string()];
+            contract
+                .create_request(
+                    request_name.clone(),
+                    request_description.clone(),
+                    images.clone(),
+                    latitude,
+                    longitude,
+                )
+                .unwrap();
+
+            set_seller_env();
+
+            // Create a seller and a store
+            let seller_name = "Bob".to_string();
+            let seller_phone = "1234567890".to_string();
+            let seller_account_type = AccountType::Seller;
+            contract
+                .create_user(
+                    seller_name.clone(),
+                    seller_phone.clone(),
+                    latitude,
+                    longitude,
+                    seller_account_type,
+                )
+                .unwrap();
+
+            let store_name = "My Store".to_string();
+            let store_description = "Best Store".to_string();
+            contract
+                .create_store(
+                    store_name.clone(),
+                    store_description,
+                    seller_phone.clone(),
+                    latitude,
+                    longitude,
+                )
+                .unwrap();
+
+            // Create an offer
+            let request_id = 1;
+            let offer_price = 100;
+            let offer_images = vec!["offer_image1".to_string()];
+            print!("Creating offer");
+            let result = contract.create_offer(
+                request_id,
+                offer_price,
+                offer_images.clone(),
+                store_name.clone(),
+            );
+
+            assert!(result.is_ok());
+
+            // Check offer creation
+            // let offers = contract.get_offer_by_request(request_id);
+            // assert_eq!(offers.len(), 1);
+            // assert_eq!(offers[0].price, offer_price);
+            // assert_eq!(offers[0].images, offer_images);
+            // assert_eq!(offers[0].store_name, store_name);
+        }
+
+        // #[test]
+        // fn test_accept_offer() {
+        //     set_contract_env();
+        //     let mut contract = Marketplace::new();
+
+        //     // Create a buyer and a request
+        //     let buyer_name = "Bob".to_string();
+        //     let buyer_phone = "0987654321".to_string();
+        //     let latitude = 98765;
+        //     let longitude = 56789;
+        //     let buyer_account_type = AccountType::Buyer;
+        //     contract
+        //         .create_user(
+        //             buyer_name.clone(),
+        //             buyer_phone.clone(),
+        //             latitude,
+        //             longitude,
+        //             buyer_account_type,
+        //         )
+        //         .unwrap();
+
+        //     let request_name = "Request 1".to_string();
+        //     let request_description = "Need this item".to_string();
+        //     let images = vec!["image1".to_string()];
+        //     contract
+        //         .create_request(
+        //             request_name.clone(),
+        //             request_description.clone(),
+        //             images.clone(),
+        //             latitude,
+        //             longitude,
+        //         )
+        //         .unwrap();
+
+        //     // Create a seller and a store
+        //     // let seller_name = "Alice".to_string();
+        //     // let seller_phone = "1234567890".to_string();
+        //     // let seller_account_type = AccountType::Seller;
+        //     // contract
+        //     //     .create_user(
+        //     //         seller_name.clone(),
+        //     //         seller_phone.clone(),
+        //     //         latitude,
+        //     //         longitude,
+        //     //         seller_account_type,
+        //     //     )
+        //     //     .unwrap();
+
+        //     // let store_name = "My Store".to_string();
+        //     // let store_description = "Best Store".to_string();
+        //     // contract
+        //     //     .create_store(
+        //     //         store_name.clone(),
+        //     //         store_description,
+        //     //         seller_phone.clone(),
+        //     //         latitude,
+        //     //         longitude,
+        //     //     )
+        //     //     .unwrap();
+
+        //     // Create an offer
+        //     // let request_id = 1;
+        //     // let offer_price = 100;
+        //     // let offer_images = vec!["offer_image1".to_string()];
+        //     // contract
+        //     //     .create_offer(
+        //     //         request_id,
+        //     //         offer_price,
+        //     //         offer_images.clone(),
+        //     //         store_name.clone(),
+        //     //     )
+        //     //     .unwrap();
+
+        //     // // Accept the offer
+        //     // let offer_id = 1;
+        //     // let result = contract.accept_offer(offer_id);
+        //     // assert!(result.is_ok());
+
+        //     // // Check if the offer was accepted
+        //     // let accepted_offer = contract.get_offer(offer_id).unwrap();
+        //     // assert_eq!(accepted_offer.is_accepted, true);
+
+        //     // // Check the request lifecycle
+        //     // let request = contract.get_request(request_id).unwrap();
+        //     // assert_eq!(request.lifecycle, RequestLifecycle::AcceptedByBuyer);
+        //     // assert_eq!(request.locked_seller_id, accepted_offer.seller_id);
+        // }
     }
 }

@@ -715,13 +715,16 @@ mod marketplace {
         fn set_buyer_env() {
             let accounts = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>();
             ink::env::test::set_caller::<DefaultEnvironment>(accounts.alice);
-            ink::env::test::set_callee::<DefaultEnvironment>(accounts.alice);
+
+            // let contract = ink::env::account_id::<ink::env::DefaultEnvironment>();
+            ink::env::test::set_callee::<DefaultEnvironment>(accounts.charlie);
         }
 
         fn set_seller_env() {
             let accounts = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>();
             ink::env::test::set_caller::<DefaultEnvironment>(accounts.bob);
-            ink::env::test::set_callee::<DefaultEnvironment>(accounts.bob);
+            // let contract = ink::env::account_id::<ink::env::DefaultEnvironment>();
+            ink::env::test::set_callee::<DefaultEnvironment>(accounts.charlie);
         }
 
         #[test]
@@ -961,110 +964,114 @@ mod marketplace {
             let request_id = 1;
             let offer_price = 100;
             let offer_images = vec!["offer_image1".to_string()];
-            print!("Creating offer");
-            let result = contract.create_offer(
-                request_id,
-                offer_price,
-                offer_images.clone(),
-                store_name.clone(),
-            );
 
-            assert!(result.is_ok());
+            contract
+                .create_offer(
+                    request_id,
+                    offer_price,
+                    offer_images.clone(),
+                    store_name.clone(),
+                )
+                .unwrap();
 
             // Check offer creation
-            // let offers = contract.get_offer_by_request(request_id);
-            // assert_eq!(offers.len(), 1);
-            // assert_eq!(offers[0].price, offer_price);
-            // assert_eq!(offers[0].images, offer_images);
-            // assert_eq!(offers[0].store_name, store_name);
+            let offers = contract.get_offer_by_request(request_id);
+            assert_eq!(offers.len(), 1);
+            assert_eq!(offers[0].price, offer_price);
+            assert_eq!(offers[0].images, offer_images);
+            assert_eq!(offers[0].store_name, store_name);
         }
 
-        // #[test]
-        // fn test_accept_offer() {
-        //     set_contract_env();
-        //     let mut contract = Marketplace::new();
+        #[test]
+        fn test_accept_offer() {
+            set_buyer_env();
+            let mut contract = Marketplace::new();
 
-        //     // Create a buyer and a request
-        //     let buyer_name = "Bob".to_string();
-        //     let buyer_phone = "0987654321".to_string();
-        //     let latitude = 98765;
-        //     let longitude = 56789;
-        //     let buyer_account_type = AccountType::Buyer;
-        //     contract
-        //         .create_user(
-        //             buyer_name.clone(),
-        //             buyer_phone.clone(),
-        //             latitude,
-        //             longitude,
-        //             buyer_account_type,
-        //         )
-        //         .unwrap();
+            // Create a buyer and a request
+            let buyer_name = "Bob".to_string();
+            let buyer_phone = "0987654321".to_string();
+            let latitude = 98765;
+            let longitude = 56789;
+            let buyer_account_type = AccountType::Buyer;
+            contract
+                .create_user(
+                    buyer_name.clone(),
+                    buyer_phone.clone(),
+                    latitude,
+                    longitude,
+                    buyer_account_type,
+                )
+                .unwrap();
 
-        //     let request_name = "Request 1".to_string();
-        //     let request_description = "Need this item".to_string();
-        //     let images = vec!["image1".to_string()];
-        //     contract
-        //         .create_request(
-        //             request_name.clone(),
-        //             request_description.clone(),
-        //             images.clone(),
-        //             latitude,
-        //             longitude,
-        //         )
-        //         .unwrap();
+            let request_name = "Request 1".to_string();
+            let request_description = "Need this item".to_string();
+            let images = vec!["image1".to_string()];
+            contract
+                .create_request(
+                    request_name.clone(),
+                    request_description.clone(),
+                    images.clone(),
+                    latitude,
+                    longitude,
+                )
+                .unwrap();
 
-        //     // Create a seller and a store
-        //     // let seller_name = "Alice".to_string();
-        //     // let seller_phone = "1234567890".to_string();
-        //     // let seller_account_type = AccountType::Seller;
-        //     // contract
-        //     //     .create_user(
-        //     //         seller_name.clone(),
-        //     //         seller_phone.clone(),
-        //     //         latitude,
-        //     //         longitude,
-        //     //         seller_account_type,
-        //     //     )
-        //     //     .unwrap();
+            set_seller_env();
 
-        //     // let store_name = "My Store".to_string();
-        //     // let store_description = "Best Store".to_string();
-        //     // contract
-        //     //     .create_store(
-        //     //         store_name.clone(),
-        //     //         store_description,
-        //     //         seller_phone.clone(),
-        //     //         latitude,
-        //     //         longitude,
-        //     //     )
-        //     //     .unwrap();
+            // Create a seller and a store
+            let seller_name = "Alice".to_string();
+            let seller_phone = "1234567890".to_string();
+            let seller_account_type = AccountType::Seller;
+            contract
+                .create_user(
+                    seller_name.clone(),
+                    seller_phone.clone(),
+                    latitude,
+                    longitude,
+                    seller_account_type,
+                )
+                .unwrap();
 
-        //     // Create an offer
-        //     // let request_id = 1;
-        //     // let offer_price = 100;
-        //     // let offer_images = vec!["offer_image1".to_string()];
-        //     // contract
-        //     //     .create_offer(
-        //     //         request_id,
-        //     //         offer_price,
-        //     //         offer_images.clone(),
-        //     //         store_name.clone(),
-        //     //     )
-        //     //     .unwrap();
+            let store_name = "My Store".to_string();
+            let store_description = "Best Store".to_string();
+            contract
+                .create_store(
+                    store_name.clone(),
+                    store_description,
+                    seller_phone.clone(),
+                    latitude,
+                    longitude,
+                )
+                .unwrap();
 
-        //     // // Accept the offer
-        //     // let offer_id = 1;
-        //     // let result = contract.accept_offer(offer_id);
-        //     // assert!(result.is_ok());
+            // Create an offer
+            let request_id = 1;
+            let offer_price = 100;
+            let offer_images = vec!["offer_image1".to_string()];
+            contract
+                .create_offer(
+                    request_id,
+                    offer_price,
+                    offer_images.clone(),
+                    store_name.clone(),
+                )
+                .unwrap();
 
-        //     // // Check if the offer was accepted
-        //     // let accepted_offer = contract.get_offer(offer_id).unwrap();
-        //     // assert_eq!(accepted_offer.is_accepted, true);
+            set_buyer_env();
 
-        //     // // Check the request lifecycle
-        //     // let request = contract.get_request(request_id).unwrap();
-        //     // assert_eq!(request.lifecycle, RequestLifecycle::AcceptedByBuyer);
-        //     // assert_eq!(request.locked_seller_id, accepted_offer.seller_id);
-        // }
+            // Accept the offer
+            let offer_id = 1;
+            let result = contract.accept_offer(offer_id);
+            assert!(result.is_ok());
+
+            // // Check if the offer was accepted
+            let accepted_offer = contract.get_offer(offer_id).unwrap();
+            assert_eq!(accepted_offer.is_accepted, true);
+
+            // Check the request lifecycle
+            let request = contract.get_request(request_id).unwrap();
+            assert_eq!(request.lifecycle, RequestLifecycle::AcceptedByBuyer);
+            assert_eq!(request.locked_seller_id, accepted_offer.seller_id);
+        }
     }
 }

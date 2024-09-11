@@ -1156,5 +1156,140 @@ mod marketplace {
             assert_eq!(request.lifecycle, RequestLifecycle::AcceptedByBuyer);
             assert_eq!(request.locked_seller_id, accepted_offer.seller_id);
         }
+
+        #[test]
+        fn test_mark_request_as_completed() {
+            set_buyer_env();
+            let mut contract = Marketplace::new();
+
+            // Create a buyer and a request
+            let buyer_name = "Bob".to_string();
+            let buyer_phone = "0987654321".to_string();
+            let latitude = 98765;
+            let longitude = 56789;
+            let buyer_account_type = AccountType::Buyer;
+            contract
+                .create_user(
+                    buyer_name.clone(),
+                    buyer_phone.clone(),
+                    latitude,
+                    longitude,
+                    buyer_account_type,
+                )
+                .unwrap();
+
+            let request_name = "Request 1".to_string();
+            let request_description = "Need this item".to_string();
+            let images = vec!["image1".to_string()];
+            contract
+                .create_request(
+                    request_name.clone(),
+                    request_description.clone(),
+                    images.clone(),
+                    latitude,
+                    longitude,
+                )
+                .unwrap();
+
+            set_seller_env();
+
+            // Create a seller and a store
+            let seller_name = "Alice".to_string();
+            let seller_phone = "1234567890".to_string();
+            let seller_account_type = AccountType::Seller;
+            contract
+                .create_user(
+                    seller_name.clone(),
+                    seller_phone.clone(),
+                    latitude,
+                    longitude,
+                    seller_account_type,
+                )
+                .unwrap();
+
+            let store_name = "My Store".to_string();
+            let store_description = "Best Store".to_string();
+            contract
+                .create_store(
+                    store_name.clone(),
+                    store_description,
+                    seller_phone.clone(),
+                    latitude,
+                    longitude,
+                )
+                .unwrap();
+
+            // Create an offer
+            let request_id = 1;
+            let offer_price = 100;
+            let offer_images = vec!["offer_image1".to_string()];
+            contract
+                .create_offer(
+                    request_id,
+                    offer_price,
+                    offer_images.clone(),
+                    store_name.clone(),
+                )
+                .unwrap();
+
+            set_buyer_env();
+
+            // Accept the offer
+            let offer_id = 1;
+            contract.accept_offer(offer_id).unwrap();
+
+            // Mark the request as completed
+            let result = contract.mark_request_as_completed(request_id);
+            assert!(result.is_ok());
+
+            // Check the request lifecycle
+            let request = contract.get_request(request_id).unwrap();
+            assert_eq!(request.lifecycle, RequestLifecycle::Completed);
+        }
+
+        #[test]
+        // remove request
+        fn test_remove_request() {
+            set_buyer_env();
+            let mut contract = Marketplace::new();
+
+            // Create a buyer and a request
+            let buyer_name = "Bob".to_string();
+            let buyer_phone = "0987654321".to_string();
+            let latitude = 98765;
+            let longitude = 56789;
+            let buyer_account_type = AccountType::Buyer;
+            contract
+                .create_user(
+                    buyer_name.clone(),
+                    buyer_phone.clone(),
+                    latitude,
+                    longitude,
+                    buyer_account_type,
+                )
+                .unwrap();
+
+            let request_name = "Request 1".to_string();
+            let request_description = "Need this item".to_string();
+            let images = vec!["image1".to_string()];
+            contract
+                .create_request(
+                    request_name.clone(),
+                    request_description.clone(),
+                    images.clone(),
+                    latitude,
+                    longitude,
+                )
+                .unwrap();
+
+            // Remove the request
+            let request_id = 1;
+            let result = contract.remove_request(request_id);
+            assert!(result.is_ok());
+
+            // Check if the request was removed
+            let request = contract.get_request(request_id);
+            assert_eq!(request, None);
+        }
     }
 }

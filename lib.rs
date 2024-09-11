@@ -711,19 +711,15 @@ mod marketplace {
         use super::*;
         use ink::env::DefaultEnvironment;
 
-        // Helper function to set up the test environment
         fn set_buyer_env() {
             let accounts = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>();
             ink::env::test::set_caller::<DefaultEnvironment>(accounts.alice);
-
-            // let contract = ink::env::account_id::<ink::env::DefaultEnvironment>();
             ink::env::test::set_callee::<DefaultEnvironment>(accounts.charlie);
         }
 
         fn set_seller_env() {
             let accounts = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>();
             ink::env::test::set_caller::<DefaultEnvironment>(accounts.bob);
-            // let contract = ink::env::account_id::<ink::env::DefaultEnvironment>();
             ink::env::test::set_callee::<DefaultEnvironment>(accounts.charlie);
         }
 

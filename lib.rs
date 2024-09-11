@@ -465,7 +465,7 @@ mod marketplace {
         }
 
         #[ink(message)]
-        pub fn remove_request(&mut self, request_id: u64) -> Result<()> {
+        pub fn delete_request(&mut self, request_id: u64) -> Result<()> {
             let caller = self.env().caller();
 
             // Fetch the request, or return an error if it doesn't exist

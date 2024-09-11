@@ -1284,7 +1284,7 @@ mod marketplace {
 
             // Remove the request
             let request_id = 1;
-            let result = contract.remove_request(request_id);
+            let result = contract.delete_request(request_id);
             assert!(result.is_ok());
 
             // Check if the request was removed

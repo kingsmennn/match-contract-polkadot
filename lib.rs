@@ -19,7 +19,7 @@ mod marketplace {
         UnauthorizedBuyer,
         OfferAlreadyAccepted,
         RequestNotAccepted,
-        NotLocked,
+        RequestNotLocked,
     }
 
     pub type Result<T> = core::result::Result<T, MarketplaceError>;
@@ -696,7 +696,7 @@ mod marketplace {
             if request.updated_at.checked_add(self.TIME_TO_LOCK).unwrap()
                 > self.env().block_timestamp()
             {
-                return Err(MarketplaceError::NotLocked);
+                return Err(MarketplaceError::RequestNotLocked);
             }
 
             request.lifecycle = RequestLifecycle::Completed;

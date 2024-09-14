@@ -1306,9 +1306,35 @@ mod marketplace {
             assert_eq!(request, None);
         }
 
-        // #[test]
-        // pub fn toggle_location() {
-        //     set_buyer_env();
-        //     let mut contract = Marketplace::new();
+        #[test]
+        pub fn toggle_location() {
+            set_buyer_env();
+            let mut contract = Marketplace::new();
+
+            // Create a buyer and a request
+            let buyer_name = "Bob".to_string();
+            let buyer_phone = "0987654321".to_string();
+            let latitude = 98765;
+            let longitude = 56789;
+            let buyer_account_type = AccountType::Buyer;
+            contract
+                .create_user(
+                    buyer_name.clone(),
+                    buyer_phone.clone(),
+                    latitude,
+                    longitude,
+                    buyer_account_type,
+                )
+                .unwrap();
+
+            let user = contract.get_user_by_id(1).unwrap();
+            assert_eq!(user.location_enabled, false);
+
+            // Toggle location
+            let result = contract.toggle_location(true);
+            let user = contract.get_user_by_id(1).unwrap();
+            assert_eq!(user.location_enabled, true);
+            assert!(result.is_ok());
+        }
     }
 }

@@ -368,6 +368,7 @@ mod marketplace {
                 .get(caller)
                 .ok_or(MarketplaceError::InvalidUser)?;
             user.location_enabled = enable_location;
+            self.users.insert(caller, &user);
             Ok(())
         }
 

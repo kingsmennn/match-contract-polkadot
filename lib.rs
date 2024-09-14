@@ -518,6 +518,7 @@ mod marketplace {
             Ok(())
         }
 
+        #[ink(message)]
         pub fn get_location_preference(&self) -> bool {
             let caller = self.env().caller();
 

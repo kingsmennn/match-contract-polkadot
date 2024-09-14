@@ -64,6 +64,17 @@ mod marketplace {
         updated_at: u64,
         account_type: AccountType,
         authority: AccountId,
+    }
+
+    #[derive(Clone)]
+    #[cfg_attr(
+        feature = "std",
+        derive(Debug, PartialEq, Eq, ink::storage::traits::StorageLayout)
+    )]
+    #[ink::scale_derive(Encode, Decode, TypeInfo)]
+    pub struct EnableLocation {
+        user_id: u64,
+        authority: AccountId,
         location_enabled: bool,
     }
 
@@ -201,6 +212,16 @@ mod marketplace {
     }
 
     #[ink(event)]
+    pub struct LocationEnabled {
+        #[ink(topic)]
+        authority: AccountId,
+        location_enabled: bool,
+        user_id: u64,
+        created_at: u64,
+        updated_at: u64,
+    }
+
+    #[ink(event)]
     pub struct OfferRemoved {
         #[ink(topic)]
         offer_id: u64,
@@ -249,6 +270,7 @@ mod marketplace {
     pub struct Marketplace {
         users: Mapping<AccountId, User>,
         requests: Mapping<u64, Request>,
+        location: Mapping<AccountId, EnableLocation>,
         offers: Mapping<u64, Offer>,
         user_store_ids: Mapping<AccountId, Vec<u64>>,
         user_stores: Mapping<(AccountId, u64), Store>,
@@ -275,6 +297,7 @@ mod marketplace {
                 offer_counter: 0,
                 TIME_TO_LOCK: 900 * 1000,
                 user_ids: Mapping::default(),
+                location: Mapping::default(),
             }
         }
 
@@ -305,7 +328,6 @@ mod marketplace {
                 updated_at: self.env().block_timestamp(),
                 account_type: account_type.clone(),
                 authority: caller.clone(),
-                location_enabled: false,
             };
 
             self.users.insert(&caller, &new_user);
@@ -357,18 +379,6 @@ mod marketplace {
                     AccountType::Seller => 1,
                 },
             });
-            Ok(())
-        }
-
-        #[ink(message)]
-        pub fn toggle_location(&mut self, enable_location: bool) -> Result<()> {
-            let caller = self.env().caller();
-            let mut user = self
-                .users
-                .get(caller)
-                .ok_or(MarketplaceError::InvalidUser)?;
-            user.location_enabled = enable_location;
-            self.users.insert(caller, &user);
             Ok(())
         }
 
@@ -476,6 +486,46 @@ mod marketplace {
                 updated_at: self.env().block_timestamp(),
             });
             Ok(())
+        }
+
+        #[ink(message)]
+        pub fn toggle_location(&mut self, enabled: bool) -> Result<()> {
+            let caller = self.env().caller();
+            let user = self
+                .users
+                .get(caller)
+                .ok_or(MarketplaceError::InvalidUser)?;
+
+            if user.account_type != AccountType::Buyer {
+                return Err(MarketplaceError::OnlyBuyersAllowed);
+            }
+
+            self.request_counter = self.request_counter.checked_add(1).unwrap();
+            let new_location = EnableLocation {
+                authority: caller,
+                location_enabled: enabled,
+                user_id: user.id,
+            };
+
+            self.location.insert(caller, &new_location);
+            self.env().emit_event(LocationEnabled {
+                authority: caller,
+                location_enabled: enabled,
+                user_id: user.id,
+                created_at: self.env().block_timestamp(),
+                updated_at: self.env().block_timestamp(),
+            });
+            Ok(())
+        }
+
+        pub fn get_location_preference(&self) -> bool {
+            let caller = self.env().caller();
+
+            let location = self.location.get(caller);
+            match location {
+                Some(location) => location.location_enabled,
+                None => true, // NOTE: we enable location by default
+            }
         }
 
         #[ink(message)]
@@ -1327,14 +1377,18 @@ mod marketplace {
                 )
                 .unwrap();
 
-            let user = contract.get_user_by_id(1).unwrap();
-            assert_eq!(user.location_enabled, false);
+            let enable_location = contract.get_location_preference();
+            assert_eq!(enable_location, true);
+            assert_ne!(enable_location, false);
 
             // Toggle location
-            let result = contract.toggle_location(true);
-            let user = contract.get_user_by_id(1).unwrap();
-            assert_eq!(user.location_enabled, true);
-            assert!(result.is_ok());
+            contract.toggle_location(true).unwrap();
+            let enable_location = contract.get_location_preference();
+            assert_eq!(enable_location, true);
+
+            contract.toggle_location(false).unwrap();
+            let enable_location = contract.get_location_preference();
+            assert_eq!(enable_location, false);
         }
     }
 }

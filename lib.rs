@@ -31,8 +31,8 @@ mod marketplace {
     )]
     #[ink::scale_derive(Encode, Decode, TypeInfo)]
     pub struct Location {
-        latitude: i64,
-        longitude: i64,
+        latitude: i128,
+        longitude: i128,
     }
 
     #[derive(Clone)]
@@ -143,8 +143,8 @@ mod marketplace {
         seller_address: AccountId,
         store_id: u64,
         store_name: String,
-        latitude: i64,
-        longitude: i64,
+        latitude: i128,
+        longitude: i128
     }
 
     #[ink(event)]
@@ -172,8 +172,8 @@ mod marketplace {
         #[ink(topic)]
         buyer_address: AccountId,
         request_name: String,
-        latitude: i64,
-        longitude: i64,
+        latitude: i128,
+        longitude: i128,
         images: Vec<String>,
         lifecycle: u8,
         description: String,
@@ -306,8 +306,8 @@ mod marketplace {
             &mut self,
             username: String,
             phone: String,
-            latitude: i64,
-            longitude: i64,
+            latitude: i128,
+            longitude: i128,
             account_type: AccountType,
         ) -> Result<()> {
             let caller = self.env().caller();
@@ -349,8 +349,8 @@ mod marketplace {
             &mut self,
             username: String,
             phone: String,
-            latitude: i64,
-            longitude: i64,
+            latitude: i128,
+            longitude: i128,
             account_type: AccountType,
         ) -> Result<()> {
             let caller = self.env().caller();
@@ -388,8 +388,8 @@ mod marketplace {
             name: String,
             description: String,
             phone: String,
-            latitude: i64,
-            longitude: i64,
+            latitude: i128,
+            longitude: i128
         ) -> Result<()> {
             let caller = self.env().caller();
             let user = self
@@ -435,8 +435,8 @@ mod marketplace {
             name: String,
             description: String,
             images: Vec<String>,
-            latitude: i64,
-            longitude: i64,
+            latitude: i128,
+            longitude: i128
         ) -> Result<()> {
             let caller = self.env().caller();
             let user = self
@@ -496,11 +496,6 @@ mod marketplace {
                 .get(caller)
                 .ok_or(MarketplaceError::InvalidUser)?;
 
-            if user.account_type != AccountType::Buyer {
-                return Err(MarketplaceError::OnlyBuyersAllowed);
-            }
-
-            self.request_counter = self.request_counter.checked_add(1).unwrap();
             let new_location = EnableLocation {
                 authority: caller,
                 location_enabled: enabled,

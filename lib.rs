@@ -6,6 +6,8 @@ mod marketplace {
     use ink::prelude::vec::Vec;
     use ink::storage::Mapping;
 
+    const REQUEST_LOCATION_THRESHOLD: f64 = 500.0; // NOTE: 500 meters
+    const LOCATION_DECIMALS: u32 = 18;
     #[ink::scale_derive(Encode, Decode, TypeInfo)]
     #[derive(Debug, PartialEq, Eq)]
     pub enum MarketplaceError {
@@ -33,6 +35,34 @@ mod marketplace {
     pub struct Location {
         latitude: i128,
         longitude: i128,
+    }
+
+    pub fn to_radian(degree: f64) -> f64 {
+        degree * std::f64::consts::PI / 180.0
+    }
+
+    pub fn calculate_distance(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
+        let r = 6371000.0; // Radius of the Earth in meters
+        let d_lat = to_radian((lat2 - lat1) as f64);
+        let d_lon = to_radian((lon2 - lon1) as f64);
+
+        let a = (d_lat / 2.0).sin() * (d_lat / 2.0).sin()
+            + to_radian(lat1 as f64).cos()
+                * to_radian(lat2 as f64).cos()
+                * (d_lon / 2.0).sin()
+                * (d_lon / 2.0).sin();
+
+        let c = 2.0 * a.sqrt().atan2((1.0 - a).sqrt());
+
+        r * c
+    }
+
+    pub fn is_within_radius(distance: f64) -> bool {
+        distance <= REQUEST_LOCATION_THRESHOLD
+    }
+
+    pub fn convert_to_location(param: i128) -> f64 {
+        param as f64 / 10u128.pow(LOCATION_DECIMALS) as f64
     }
 
     #[derive(Clone)]
@@ -144,7 +174,7 @@ mod marketplace {
         store_id: u64,
         store_name: String,
         latitude: i128,
-        longitude: i128
+        longitude: i128,
     }
 
     #[ink(event)]
@@ -389,7 +419,7 @@ mod marketplace {
             description: String,
             phone: String,
             latitude: i128,
-            longitude: i128
+            longitude: i128,
         ) -> Result<()> {
             let caller = self.env().caller();
             let user = self
@@ -436,7 +466,7 @@ mod marketplace {
             description: String,
             images: Vec<String>,
             latitude: i128,
-            longitude: i128
+            longitude: i128,
         ) -> Result<()> {
             let caller = self.env().caller();
             let user = self
@@ -808,11 +838,30 @@ mod marketplace {
         }
 
         #[ink(message)]
-        pub fn get_all_requests(&self) -> Vec<Request> {
+        pub fn get_all_requests(&mut self) -> Vec<Request> {
             let mut all_requests = Vec::new();
+
+            let caller = self.env().caller();
+
+            let user = self.users.get(caller).unwrap();
+
+            let location_enabled = self.get_location_preference();
+
             for request_id in 0..=self.request_counter {
                 if let Some(request) = self.requests.get(request_id) {
-                    all_requests.push(request.clone());
+                    if location_enabled {
+                        let distance = calculate_distance(
+                            convert_to_location(user.location.latitude),
+                            convert_to_location(user.location.longitude),
+                            convert_to_location(request.location.latitude),
+                            convert_to_location(request.location.longitude),
+                        );
+                        if is_within_radius(distance) {
+                            all_requests.push(request.clone());
+                        }
+                    } else if request.location.latitude == 0 && request.location.longitude == 0 {
+                        all_requests.push(request.clone());
+                    }
                 }
             }
             all_requests
@@ -1385,6 +1434,32 @@ mod marketplace {
             contract.toggle_location(false).unwrap();
             let enable_location = contract.get_location_preference();
             assert_eq!(enable_location, false);
+        }
+
+        #[test]
+        pub fn is_within_radius_test() {
+            let lat1: f64 = 129715987 as f64 / 10i128.pow(LOCATION_DECIMALS) as f64;
+            let lon1: f64 = 775945627 as f64 / 10i128.pow(LOCATION_DECIMALS) as f64;
+            let lat2: f64 = 129715987 as f64 / 10i128.pow(LOCATION_DECIMALS) as f64;
+            let lon2: f64 = 775945627 as f64 / 10i128.pow(LOCATION_DECIMALS) as f64;
+            let distance = calculate_distance(lat1, lon1, lat2, lon2);
+            assert_eq!(distance, 0.0);
+
+            let lat1: f64 = 40.785091;
+            let lon1: f64 = -73.968285;
+            let lat2: f64 = 40.789591;
+            let lon2: f64 = -73.968285;
+
+            let api_lat = 40785091000000000000;
+            let api_long: i128 = -73968285000000000000;
+
+            assert_eq!(convert_to_location(api_lat), lat1);
+            assert_eq!(convert_to_location(api_long), lon1);
+
+            let distance = calculate_distance(lat1, lon1, lat2, lon2);
+            let allowed_radius = is_within_radius(distance);
+
+            assert_eq!(allowed_radius, false);
         }
     }
 }

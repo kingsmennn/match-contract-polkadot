@@ -64,17 +64,6 @@ mod marketplace {
         updated_at: u64,
         account_type: AccountType,
         authority: AccountId,
-    }
-
-    #[derive(Clone)]
-    #[cfg_attr(
-        feature = "std",
-        derive(Debug, PartialEq, Eq, ink::storage::traits::StorageLayout)
-    )]
-    #[ink::scale_derive(Encode, Decode, TypeInfo)]
-    pub struct EnableLocation {
-        user_id: u64,
-        authority: AccountId,
         location_enabled: bool,
     }
 
@@ -144,7 +133,7 @@ mod marketplace {
         store_id: u64,
         store_name: String,
         latitude: i128,
-        longitude: i128
+        longitude: i128,
     }
 
     #[ink(event)]
@@ -184,6 +173,15 @@ mod marketplace {
         created_at: u64,
         updated_at: u64,
     }
+    #[ink(event)]
+    pub struct LocationEnabled {
+        #[ink(topic)]
+        authority: AccountId,
+        location_enabled: bool,
+        user_id: u64,
+        created_at: u64,
+        updated_at: u64,
+    }
 
     #[ink(event)]
     pub struct OfferCreated {
@@ -209,16 +207,6 @@ mod marketplace {
         seller_id: u64,
         updated_at: u64,
         sellers_price_quote: i64,
-    }
-
-    #[ink(event)]
-    pub struct LocationEnabled {
-        #[ink(topic)]
-        authority: AccountId,
-        location_enabled: bool,
-        user_id: u64,
-        created_at: u64,
-        updated_at: u64,
     }
 
     #[ink(event)]
@@ -270,7 +258,6 @@ mod marketplace {
     pub struct Marketplace {
         users: Mapping<AccountId, User>,
         requests: Mapping<u64, Request>,
-        location: Mapping<AccountId, EnableLocation>,
         offers: Mapping<u64, Offer>,
         user_store_ids: Mapping<AccountId, Vec<u64>>,
         user_stores: Mapping<(AccountId, u64), Store>,
@@ -297,7 +284,6 @@ mod marketplace {
                 offer_counter: 0,
                 TIME_TO_LOCK: 900 * 1000,
                 user_ids: Mapping::default(),
-                location: Mapping::default(),
             }
         }
 
@@ -328,6 +314,7 @@ mod marketplace {
                 updated_at: self.env().block_timestamp(),
                 account_type: account_type.clone(),
                 authority: caller.clone(),
+                location_enabled: true, // NOTE: we enable location by default
             };
 
             self.users.insert(&caller, &new_user);
@@ -389,7 +376,7 @@ mod marketplace {
             description: String,
             phone: String,
             latitude: i128,
-            longitude: i128
+            longitude: i128,
         ) -> Result<()> {
             let caller = self.env().caller();
             let user = self
@@ -436,7 +423,7 @@ mod marketplace {
             description: String,
             images: Vec<String>,
             latitude: i128,
-            longitude: i128
+            longitude: i128,
         ) -> Result<()> {
             let caller = self.env().caller();
             let user = self
@@ -491,18 +478,14 @@ mod marketplace {
         #[ink(message)]
         pub fn toggle_location(&mut self, enabled: bool) -> Result<()> {
             let caller = self.env().caller();
-            let user = self
+            let mut user = self
                 .users
                 .get(caller)
                 .ok_or(MarketplaceError::InvalidUser)?;
 
-            let new_location = EnableLocation {
-                authority: caller,
-                location_enabled: enabled,
-                user_id: user.id,
-            };
+            user.location_enabled = enabled;
 
-            self.location.insert(caller, &new_location);
+            self.users.insert(caller, &user);
             self.env().emit_event(LocationEnabled {
                 authority: caller,
                 location_enabled: enabled,
@@ -517,11 +500,8 @@ mod marketplace {
         pub fn get_location_preference(&self) -> bool {
             let caller = self.env().caller();
 
-            let location = self.location.get(caller);
-            match location {
-                Some(location) => location.location_enabled,
-                None => true, // NOTE: we enable location by default
-            }
+            let user = self.users.get(caller).unwrap();
+            return user.location_enabled;
         }
 
         #[ink(message)]

@@ -476,35 +476,6 @@ mod marketplace {
         }
 
         #[ink(message)]
-        pub fn toggle_location(&mut self, enabled: bool) -> Result<()> {
-            let caller = self.env().caller();
-            let mut user = self
-                .users
-                .get(caller)
-                .ok_or(MarketplaceError::InvalidUser)?;
-
-            user.location_enabled = enabled;
-
-            self.users.insert(caller, &user);
-            self.env().emit_event(LocationEnabled {
-                authority: caller,
-                location_enabled: enabled,
-                user_id: user.id,
-                created_at: self.env().block_timestamp(),
-                updated_at: self.env().block_timestamp(),
-            });
-            Ok(())
-        }
-
-        #[ink(message)]
-        pub fn get_location_preference(&self) -> bool {
-            let caller = self.env().caller();
-
-            let user = self.users.get(caller).unwrap();
-            return user.location_enabled;
-        }
-
-        #[ink(message)]
         pub fn delete_request(&mut self, request_id: u64) -> Result<()> {
             let caller = self.env().caller();
 
@@ -744,6 +715,35 @@ mod marketplace {
             self.requests.insert(request_id, &request);
 
             Ok(())
+        }
+
+        #[ink(message)]
+        pub fn toggle_location(&mut self, enabled: bool) -> Result<()> {
+            let caller = self.env().caller();
+            let mut user = self
+                .users
+                .get(caller)
+                .ok_or(MarketplaceError::InvalidUser)?;
+
+            user.location_enabled = enabled;
+
+            self.users.insert(caller, &user);
+            self.env().emit_event(LocationEnabled {
+                authority: caller,
+                location_enabled: enabled,
+                user_id: user.id,
+                created_at: self.env().block_timestamp(),
+                updated_at: self.env().block_timestamp(),
+            });
+            Ok(())
+        }
+
+        #[ink(message)]
+        pub fn get_location_preference(&self) -> bool {
+            let caller = self.env().caller();
+
+            let user = self.users.get(caller).unwrap();
+            return user.location_enabled;
         }
 
         #[ink(message)]
